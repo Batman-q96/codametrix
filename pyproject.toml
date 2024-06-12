@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Coda Metrix Engineering Test"
+version = "0.0.0"
+description = "A takehome exam for Coda Metrix"
+readme = "README.md"
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+include = '\.pyi?$'
+# by defualt Black excludes files from gitignore
+# 'extend-exclude' excludes files or directories in addition to the defaults
+extend-exclude = '''
+'''
