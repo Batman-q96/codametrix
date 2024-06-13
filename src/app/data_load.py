@@ -18,7 +18,7 @@ def main():
     # docs suggest SparkSession.builder.getOrCreate() but that syntax doesn't
     # have appropriate type checking and this is the same execution
 
-    spark_df = load_file_into_pyspark_dataframe(spark)
+    spark_df = load_file_into_pyspark_dataframe(spark, filepath="")
     print(spark_df.show())
     return spark_df
 
