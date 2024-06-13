@@ -2,13 +2,13 @@ from typing import Optional
 
 import dataclasses
 
+import json
+
 import pyspark
 import pyspark.sql
-import pyspark.sql.dataframe
-import pyspark.sql.functions
+from pyspark.sql import functions, types as spark_types
 
 import pyspark.data
-import pyspark.sql.types
 
 
 @dataclasses.dataclass
@@ -37,7 +37,7 @@ class DataCleaner:
             column_name,
             data_to_clean[column_name]
             .rlike(r"(?i)^yes$|(?i)^true$")
-            .cast(pyspark.sql.types.BooleanType()),
+            .cast(spark_types.BooleanType()),
         )
         return clean_data
 
@@ -45,7 +45,7 @@ class DataCleaner:
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "date"
     ) -> pyspark.sql.DataFrame:
         clean_data = data_to_clean.withColumn(
-            column_name, pyspark.sql.functions.to_date(data_to_clean[column_name])
+            column_name, functions.to_date(data_to_clean[column_name])
         )
         return clean_data
 
@@ -53,41 +53,87 @@ class DataCleaner:
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "engineer"
     ) -> pyspark.sql.DataFrame:
         clean_data = data_to_clean.withColumn(
-            column_name, pyspark.sql.functions.lcase(data_to_clean[column_name])
+            column_name, functions.lcase(data_to_clean[column_name])
         )
         return clean_data
 
     def _cleanup_jira_ticket_id_column(
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "jira_ticket_id"
     ) -> pyspark.sql.DataFrame:
-        """Passthrough as this column looks to need no sanitization"""
-        return data_to_clean
+        clean_data = data_to_clean.withColumn(
+            column_name, data_to_clean[column_name].cast(spark_types.IntegerType())
+        )
+        return clean_data
 
     def _cleanup_lines_per_repo_column(
-        self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "lines_per_repo"
+        self,
+        data_to_clean: pyspark.sql.DataFrame,
+        column_name: str = "lines_per_repo",
+        key_column_name: str = "jira_ticket_id",
     ) -> pyspark.sql.DataFrame:
-        """Passthrough as this column looks to need no sanitization"""
-        return data_to_clean
+        data_type = data_to_clean.schema[column_name].dataType
+        if isinstance(data_type, spark_types.ArrayType):
+            element_type = data_type.elementType
+            if isinstance(element_type, spark_types.StructType):
+                names = element_type.names
+            else:
+                raise TypeError
+        else:
+            raise TypeError
+        working_data = data_to_clean.select(
+            key_column_name, functions.inline(data_to_clean[column_name])
+        )
+        map_data = working_data
+        map_data = map_data.withColumns(
+            {
+                name: functions.when(
+                    working_data[name] > 0,
+                    functions.create_map([functions.lit(name), working_data[name]]).alias(name),
+                )
+                for name in names
+            }
+        )
+        COALESCED_COLUMN_NAME = "coalesced"
+        coalesced_data = map_data.withColumn(COALESCED_COLUMN_NAME, functions.coalesce(*names))
+        coalesced_data = coalesced_data.groupBy(key_column_name).agg(
+            functions.collect_list(COALESCED_COLUMN_NAME).alias(COALESCED_COLUMN_NAME)
+        )
+
+        clean_data = data_to_clean.join(coalesced_data, on=key_column_name, how="outer")
+        clean_data = clean_data.withColumn(column_name, clean_data[COALESCED_COLUMN_NAME])
+        clean_data = clean_data.drop(clean_data[COALESCED_COLUMN_NAME])
+
+        return clean_data
 
     def _cleanup_num_hours_column(
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "num_hours"
     ) -> pyspark.sql.DataFrame:
         clean_data = data_to_clean.withColumn(
-            column_name, data_to_clean[column_name].cast(pyspark.sql.types.FloatType())
+            column_name, data_to_clean[column_name].cast(spark_types.FloatType())
         )
         return clean_data
 
     def _cleanup_num_slack_messages_column(
-        self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "slack_messages"
+        self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "num_slack_messages"
     ) -> pyspark.sql.DataFrame:
-        """Passthrough as this column looks to need no sanitization"""
-        return data_to_clean
+        clean_data = data_to_clean.withColumn(
+            column_name, data_to_clean[column_name].cast(spark_types.IntegerType())
+        )
+        return clean_data
 
     def _cleanup_num_ticket_description_column(
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "ticket_description"
     ) -> pyspark.sql.DataFrame:
-        """Passthrough as this column looks to need no sanitization"""
-        return data_to_clean
+        clean_data = data_to_clean.withColumn(
+            column_name, data_to_clean[column_name].cast(spark_types.IntegerType())
+        )
+        return clean_data
+
+    def show_clean_schema(self) -> dict:
+        if self.clean_data:
+            return json.loads(self.clean_data.schema.json())
+        else:
+            raise ValueError
 
     def run_data_cleanup(self) -> pyspark.sql.DataFrame:
         self.working_data = self.dirty_data
@@ -114,7 +160,7 @@ def main():
     cleaner = DataCleaner(spark=spark, dirty_data=spark_df)
     clean_data = cleaner.run_data_cleanup()
 
-    print(clean_data.schema)
+    print(cleaner.show_clean_schema())
     print(clean_data.show())
 
     return clean_data
