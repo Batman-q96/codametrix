@@ -27,10 +27,22 @@ Docker may be used to run this independently.
 
 1. Build the docker image
 ```
-Docker build . -t codametrix
+Docker build . -t batmanq96/codametrix
 ```
 
-2. Run the tests
+2. Run the container
 ```
-Docker run -t codametrix pytest
+Docker run -it batmanq96/codametrix bash
+```
+
+## Another alternative
+You can pull the already built container
+1. Pull from dockerhub
+```
+Docker pull batmanq96/codametrix:v0
+```
+
+2. Run the tests as above
+```
+Docker run -it batmanq96/codametrix bash
 ```
