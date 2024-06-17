@@ -53,7 +53,7 @@ class DataCleaner:
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "engineer"
     ) -> pyspark.sql.DataFrame:
         clean_data = data_to_clean.withColumn(
-            column_name, functions.lcase(data_to_clean[column_name])
+            column_name, functions.initcap(functions.lcase(data_to_clean[column_name]))
         )
         return clean_data
 
@@ -93,6 +93,9 @@ class DataCleaner:
                 for name in names
             }
         )
+        # check assumption that only one valid value per column
+        # xxx=map_data.withColumn('numNulls', sum(map_data[col].isNull().cast('int') for col in map_data.columns))
+        # xxx.agg({"numNulls": "min"}).show()
         COALESCED_COLUMN_NAME = "coalesced"
         coalesced_data = map_data.withColumn(COALESCED_COLUMN_NAME, functions.coalesce(*names))
         coalesced_data = coalesced_data.groupBy(key_column_name).agg(
@@ -124,10 +127,28 @@ class DataCleaner:
     def _cleanup_num_ticket_description_column(
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "ticket_description"
     ) -> pyspark.sql.DataFrame:
-        clean_data = data_to_clean.withColumn(
-            column_name, data_to_clean[column_name].cast(spark_types.IntegerType())
-        )
-        return clean_data
+        """Passthrough as this column looks to need no sanitization"""
+        return data_to_clean
+
+    def _order_columns(
+        self,
+        data_to_clean: pyspark.sql.DataFrame,
+        ordered_list_of_column_names: Optional[list[str]] = None,
+    ):
+        if not ordered_list_of_column_names:
+            ordered_list_of_column_names = [
+                "jira_ticket_id",
+                "date",
+                "completed",
+                "num_slack_messages",
+                "num_hours",
+                "engineer",
+                "ticket_description",
+                "KPIs",
+                "lines_per_repo",
+            ]
+        ordered_data = data_to_clean.select(*[ordered_list_of_column_names])
+        return ordered_data
 
     def show_clean_schema(self) -> dict:
         if self.clean_data:
@@ -146,6 +167,7 @@ class DataCleaner:
         self.working_data = self._cleanup_num_hours_column(self.working_data)
         self.working_data = self._cleanup_num_slack_messages_column(self.working_data)
         self.working_data = self._cleanup_num_ticket_description_column(self.working_data)
+        self.working_data = self._order_columns(self.working_data)
         self.clean_data = self.working_data
         return self.clean_data
 
