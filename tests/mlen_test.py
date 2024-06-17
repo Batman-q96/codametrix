@@ -5,7 +5,7 @@ import pyspark.sql.functions as F
 import hashlib
 import pytest
 
-from app import main
+from app import main, data_analyzer
 
 
 @pytest.fixture(scope="session")
@@ -40,6 +40,11 @@ def df() -> DataFrame:
     return main.get_and_cleanup_script()
 
 
+@pytest.fixture(scope="session")
+def analyzer(df) -> data_analyzer.DataAnalyzer:
+    return data_analyzer.DataAnalyzer(input_data=df)
+
+
 def hash_util(obj) -> str:
     """Function to return the hash of the object
 
@@ -62,29 +67,29 @@ def test_count_of_unique_tickets(df):
     assert hash_util(res.count()) == "14ee22eaba297944c96afdbe5b16c65b"
 
 
-def test_q1_longest_description(df):
+def test_q1_longest_description(analyzer: data_analyzer.DataAnalyzer):
     """
     Question: What is the longest Jira ticket description?
 
     Return the longest ticket description
     ex: [Row(ticket_description='...')]
     """
-    res = ...
+    res = analyzer.get_longest_ticket_description(output_column_name="ticket_description")
     assert hash_util(res.collect()) == "a0ef0d383ff7ee8a3af1669f9a8e0f14"
 
 
-def test_q2_repo_with_max_lines(df):
+def test_q2_repo_with_max_lines(analyzer: data_analyzer.DataAnalyzer):
     """
     Question: Which repo had the most lines of code added?
 
     Return the repo with maximum lines of code added
     ex: [Row(repo='...')]
     """
-    res = ...
+    res = analyzer.get_repo_with_most_lines()
     assert hash_util(res.collect()) == "7f2650ec9b6159c18eba65f65615740d"
 
 
-def test_q3_max_number_of_slack_messages_per_engineer(df):
+def test_q3_max_number_of_slack_messages_per_engineer(analyzer: data_analyzer.DataAnalyzer):
     """
     Question: Provide the maximum number of Slack messages in any ticket for each engineer
 
@@ -96,33 +101,43 @@ def test_q3_max_number_of_slack_messages_per_engineer(df):
 
     hint: Results are ordered by engineer
     """
-    res = ...
+    res = analyzer.get_max_messages_for_all_engineers(
+        output_column_name="max_messages", ascending=True, exclude_null=True
+    )
     assert hash_util(res.collect()) == "a237ab13f39d30d21b8b937359e9c01f"
 
 
-def test_q4_mean_hours_spent(df):
+def test_q4_mean_hours_spent(analyzer: data_analyzer.DataAnalyzer):
     """
     Question: Mean hours spent on a ticket in June 2023
 
     Return Mean hours spent on a ticket of specific month and year
     ex: [Row(mean_hours=...)]
     """
-    res = ...
+    import datetime
+
+    res = analyzer.get_mean_hours_spent(
+        start_date=datetime.date(2023, 6, 1), end_date=datetime.date(2023, 6, 30)
+    )
+    # TODO: figure out what's going wrong here
     assert hash_util(res.collect()) == "7facdf09b955d4732ed4138d3fa48778"
 
 
-def test_q5_total_lines_contributed(df):
+def test_q5_total_lines_contributed(analyzer: data_analyzer.DataAnalyzer):
     """
     Question: Total lines of code contributed by completed tickets to the repo 'A'
 
     Return the total_lines_of_code_contributed
     ex: [Row(total=...)]
     """
-    res = ...
+    res = analyzer.get_total_lines_of_code_to_repo("A")
+    # TODO: figure out what's going wrong here
     assert hash_util(res.collect()) == "6adec64b2a723c9a52024c53068f264d"
 
 
-def test_q6_total_new_revenue_per_engineer_per_company_initiative(df):
+def test_q6_total_new_revenue_per_engineer_per_company_initiative(
+    analyzer: data_analyzer.DataAnalyzer,
+):
     """
     Question: Total new revenue per engineer per company initiative
 
@@ -133,5 +148,7 @@ def test_q6_total_new_revenue_per_engineer_per_company_initiative(df):
 
     hint: Order the results by engineer. Pay attention to the order of the intitiatives and total_revenue in KPI's
     """
-    res = ...
+    res = analyzer.get_total_revenue_per_engineer_per_company_initiative(
+        kpis_initiaitive_ascending=True, engineers_ascending=True, filter_null_engineers=False
+    )
     assert hash_util(res.collect()) == "c7b9f4457e8682313464d604f6f66581"
