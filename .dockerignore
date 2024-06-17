@@ -1,0 +1,7 @@
+.vscode
+.devcontainer
+
+venv
+
+*.pyc
+*.egg-info
