@@ -39,7 +39,7 @@ Docker run -it batmanq96/codametrix bash
 You can pull the already built container
 1. Pull from dockerhub
 ```
-Docker pull batmanq96/codametrix:v0
+Docker pull batmanq96/codametrix
 ```
 
 2. Run the tests as above
