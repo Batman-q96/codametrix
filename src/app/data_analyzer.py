@@ -86,18 +86,44 @@ class DataAnalyzer:
         end_date: datetime.date,
         date_column_name: str = "date",
         hours_spent_column_name: str = "num_hours",
+        ticket_id_column_name: str = "jira_ticket_id",
+        engineer_column_name: str = "engineer",
         output_column_name: str = "mean_hours",
+        filter_null_dates: bool = True,
+        ignore_null_engineers: bool = True,
+        only_positive_hours: bool = True,
     ) -> pyspark.sql.DataFrame:
-        self.working_data = self.input_data.filter(
-            (self.input_data[date_column_name] >= start_date)
-            & (self.input_data[date_column_name] <= end_date)
-            | self.input_data[date_column_name].isNotNull()
+        if filter_null_dates:
+            self.working_data = self.input_data.filter(
+                (self.input_data[date_column_name] >= start_date)
+                & (self.input_data[date_column_name] <= end_date)
+                & self.input_data[date_column_name].isNotNull()
+            )
+        else:
+            self.working_data = self.input_data.filter(
+                (self.input_data[date_column_name] >= start_date)
+                & (self.input_data[date_column_name] <= end_date)
+                | self.input_data[date_column_name].isNull()
+            )
+        if ignore_null_engineers:
+            self.working_data = self.working_data.filter(
+                self.working_data[engineer_column_name].isNotNull()
+            )
+
+        if only_positive_hours:
+            self.working_data = self.working_data.filter(
+                self.working_data[hours_spent_column_name] >= 0
+            )
+
+        # add up all hours by everyone working on the same ticket
+        grouped_data = self.working_data.groupBy(self.working_data[ticket_id_column_name])
+        result_data = grouped_data.agg(
+            functions.sum(self.working_data[hours_spent_column_name]).alias(output_column_name)
         )
-        self.working_data = self.working_data.agg(
-            functions.avg(self.working_data[hours_spent_column_name]).alias(output_column_name)
+        # then return the average of that
+        return result_data.agg(
+            functions.avg(result_data[output_column_name]).alias(output_column_name)
         )
-        # TODO: figure out why this doesn't work right
-        return self.working_data
 
     def get_total_lines_of_code_to_repo(
         self,
