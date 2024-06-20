@@ -50,11 +50,16 @@ class DataCleaner:
         return clean_data
 
     def _cleanup_engineer_column(
-        self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "engineer"
+        self,
+        data_to_clean: pyspark.sql.DataFrame,
+        column_name: str = "engineer",
+        remove_nulls: bool = False,
     ) -> pyspark.sql.DataFrame:
         clean_data = data_to_clean.withColumn(
             column_name, functions.initcap(functions.lcase(data_to_clean[column_name]))
         )
+        if remove_nulls:
+            clean_data = clean_data.filter(clean_data[column_name].isNotNull())
         return clean_data
 
     def _cleanup_jira_ticket_id_column(
@@ -111,9 +116,14 @@ class DataCleaner:
     def _cleanup_num_hours_column(
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "num_hours"
     ) -> pyspark.sql.DataFrame:
-        clean_data = data_to_clean.withColumn(
+        cast_data = data_to_clean.withColumn(
             column_name, data_to_clean[column_name].cast(spark_types.FloatType())
         )
+        # several things could be done to deal with negative values here
+        # option 1
+        clean_data = cast_data.withColumn(column_name, functions.abs(cast_data[column_name]))
+        # option 2
+        # clean_data = cast_data.filter(cast_data[column_name] >= 0)
         return clean_data
 
     def _cleanup_num_slack_messages_column(

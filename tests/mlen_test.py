@@ -120,8 +120,7 @@ def test_q4_mean_hours_spent(analyzer: data_analyzer.DataAnalyzer):
         start_date=datetime.date(2023, 6, 1),
         end_date=datetime.date(2023, 6, 30),
         filter_null_dates=True,
-        ignore_null_engineers=True,
-        only_positive_hours=True,
+        ignore_null_engineers=False,
     )
     # TODO: figure out what's going wrong here
     assert hash_util(res.collect()) == "7facdf09b955d4732ed4138d3fa48778"

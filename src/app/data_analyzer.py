@@ -91,7 +91,6 @@ class DataAnalyzer:
         output_column_name: str = "mean_hours",
         filter_null_dates: bool = True,
         ignore_null_engineers: bool = True,
-        only_positive_hours: bool = True,
     ) -> pyspark.sql.DataFrame:
         if filter_null_dates:
             self.working_data = self.input_data.filter(
@@ -108,11 +107,6 @@ class DataAnalyzer:
         if ignore_null_engineers:
             self.working_data = self.working_data.filter(
                 self.working_data[engineer_column_name].isNotNull()
-            )
-
-        if only_positive_hours:
-            self.working_data = self.working_data.filter(
-                self.working_data[hours_spent_column_name] >= 0
             )
 
         # add up all hours by everyone working on the same ticket
