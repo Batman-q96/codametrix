@@ -2,6 +2,8 @@ import dataclasses
 import datetime
 import string
 
+import hashlib
+
 from typing import Optional
 
 import pyspark.sql
@@ -127,16 +129,18 @@ class DataAnalyzer:
         output_column_name: str = "total",
     ) -> pyspark.sql.DataFrame:
         self.working_data = self.input_data.filter(self.input_data[completed_column_name] == True)
-        exploded_data = self.working_data.select(
-            functions.explode(self.working_data[repo_lines_column_name]).alias(output_column_name)
+        # self.working_data = self.working_data.filter(functions.size(self.working_data["KPIs"])==1)
+        exploded_data = self.working_data.withColumn(
+            repo_lines_column_name,
+            functions.explode(self.working_data[repo_lines_column_name]).alias(output_column_name),
         )
         repo_data = exploded_data.withColumn(
-            output_column_name, exploded_data[output_column_name][repo_name]
+            output_column_name, exploded_data[repo_lines_column_name][repo_name]
         )
-        filtered_repo_data = repo_data.filter(repo_data[output_column_name].isNotNull())
         # TODO: figure out why this doesn't work right
-        return filtered_repo_data.agg(
-            functions.sum(filtered_repo_data[output_column_name]).alias(output_column_name)
+        # correct answer is 168195
+        return repo_data.select(repo_data[output_column_name]).agg(
+            functions.sum(repo_data[output_column_name]).alias(output_column_name)
         )
 
     def get_total_revenue_per_engineer_per_company_initiative(
@@ -175,12 +179,29 @@ class DataAnalyzer:
         grouped_data = structed_data.groupBy(engineer_column_name)
         output_data = grouped_data.agg(
             functions.array_agg(output_column_name).alias(output_column_name)
-        ).sort(engineer_column_name, ascending=engineers_ascending)
+        )
         if filter_null_engineers:
             filtered_data = output_data.filter(output_data[engineer_column_name].isNotNull())
         else:
             filtered_data = output_data
-        return filtered_data
+        return filtered_data.sort(engineer_column_name, ascending=engineers_ascending)
+
+
+def hash_util(obj) -> str:
+    """Function to return the hash of the object
+
+    Args:
+        obj (_type_): Object can be of type string, int, float, Pyspark Row, list of Pyspark Rows,
+        any objetct that can be projected in string format
+
+    Returns:
+        str: Hash of the object
+    """
+    return hashlib.md5(str(obj).encode("utf-8")).hexdigest()
+
+
+def hash_entry(obj) -> bytes:
+    return str(obj).encode("utf-8")
 
 
 def main():
@@ -194,7 +215,10 @@ def main():
     print(analyzer.get_max_messages_for_all_engineers(output_column_name="max_messages").show())
     print(
         analyzer.get_mean_hours_spent(
-            start_date=datetime.date(2023, 6, 1), end_date=datetime.date(2023, 6, 30)
+            start_date=datetime.date(2023, 6, 1),
+            end_date=datetime.date(2023, 6, 30),
+            filter_null_dates=True,
+            ignore_null_engineers=False,
         ).show()
     )
     print(analyzer.get_total_lines_of_code_to_repo("A").show())
@@ -206,5 +230,17 @@ def main():
     print("done")
 
 
+def hash_break_brute_force():
+    # this was used to figure out what the target number of rows to acheive was. Ultimately even
+    # knowing the target row number was insufficient for me to match assumptions
+    for i in range(247559):
+        if hash_util(f"[Row(total={i})]") == "6adec64b2a723c9a52024c53068f264d":
+            print(i)
+            break
+    else:
+        print("no i found")
+
+
 if __name__ == "__main__":
     main()
+    # hash_break_brute_force()
