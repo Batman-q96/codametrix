@@ -121,9 +121,9 @@ class DataCleaner:
         )
         # several things could be done to deal with negative values here
         # option 1
-        # clean_data = clean_data.withColumn(column_name, functions.abs(clean_data[column_name]))
+        clean_data = clean_data.withColumn(column_name, functions.abs(clean_data[column_name]))
         # option 2
-        clean_data = clean_data.filter(clean_data[column_name] >= 0)
+        # clean_data = clean_data.filter(clean_data[column_name] >= 0)
         return clean_data
 
     def _cleanup_num_slack_messages_column(
