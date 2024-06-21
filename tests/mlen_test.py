@@ -152,6 +152,6 @@ def test_q6_total_new_revenue_per_engineer_per_company_initiative(
     hint: Order the results by engineer. Pay attention to the order of the intitiatives and total_revenue in KPI's
     """
     res = analyzer.get_total_revenue_per_engineer_per_company_initiative(
-        kpis_initiaitive_ascending=True, engineers_ascending=True, filter_null_engineers=False
+        kpis_initiaitive_ascending=True, engineers_ascending=True, filter_null_engineers=True
     )
     assert hash_util(res.collect()) == "c7b9f4457e8682313464d604f6f66581"
