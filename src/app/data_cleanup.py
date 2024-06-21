@@ -116,14 +116,14 @@ class DataCleaner:
     def _cleanup_num_hours_column(
         self, data_to_clean: pyspark.sql.DataFrame, column_name: str = "num_hours"
     ) -> pyspark.sql.DataFrame:
-        cast_data = data_to_clean.withColumn(
+        clean_data = data_to_clean.withColumn(
             column_name, data_to_clean[column_name].cast(spark_types.FloatType())
         )
         # several things could be done to deal with negative values here
         # option 1
-        clean_data = cast_data.withColumn(column_name, functions.abs(cast_data[column_name]))
+        # clean_data = clean_data.withColumn(column_name, functions.abs(clean_data[column_name]))
         # option 2
-        # clean_data = cast_data.filter(cast_data[column_name] >= 0)
+        clean_data = clean_data.filter(clean_data[column_name] >= 0)
         return clean_data
 
     def _cleanup_num_slack_messages_column(
